@@ -66,52 +66,164 @@
     if (flow) {
       const play = flow.querySelector(".flow-play");
       const label = play.querySelector(".flow-play-label");
+      const icon = play.querySelector(".flow-control-icon");
       const workers = [...flow.querySelectorAll(".agent-worker")];
+      const mission = flow.querySelector(".agent-mission");
+      const counter = flow.querySelector(".flow-scenario-count");
+      const state = flow.querySelector(".flow-state");
       const announcement = flow.querySelector(".flow-announcement");
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-      let timers = [];
+      let scenarios;
+      try {
+        scenarios = JSON.parse(flow.querySelector(".agent-scenarios").textContent);
+      } catch {
+        return; // Keep the static diagram if its optional scenario data is unavailable.
+      }
+      if (!Array.isArray(scenarios) || !scenarios.length || !scenarios.every((scenario) =>
+        typeof scenario.mission === "string" && Array.isArray(scenario.agents) &&
+        scenario.agents.length === workers.length && scenario.agents.every((agent) =>
+          typeof agent.role === "string" && typeof agent.task === "string"))) return;
 
+      const checkpoints = [...workers.map((_, index) => 1000 + index * 400), 2200, 7000];
+      let scenarioIndex = 0;
+      let checkpoint = 0;
+      let elapsed = 0;
+      let resumedAt = 0;
+      let timer = null;
+      let running = false;
+      let started = false;
+      let userPaused = false;
+      let manualStart = false;
+      let managerReached = false;
+      let inViewport = !("IntersectionObserver" in window);
+      let arrivalObserver;
+
+      function updateControls() {
+        const action = running ? flow.dataset.pause : started ? flow.dataset.resume : flow.dataset.start;
+        label.textContent = action;
+        icon.textContent = running ? "Ⅱ" : "▶";
+        play.setAttribute("aria-label", action);
+        flow.dataset.playback = running ? "playing" : started ? "paused" : "idle";
+        if (state) state.textContent = running ? flow.dataset.running : started ? flow.dataset.paused : flow.dataset.pending;
+      }
       function assign(worker) {
         worker.classList.add("is-assigned");
         worker.querySelector(".agent-assignment").textContent = flow.dataset.assigned;
       }
-      function finish() {
-        timers.forEach(clearTimeout);
-        timers = [];
-        workers.forEach(assign);
+      function prepareScenario() {
+        const scenario = scenarios[scenarioIndex];
+        mission.textContent = scenario.mission;
+        workers.forEach((worker, index) => {
+          worker.classList.remove("is-assigned");
+          worker.querySelector("h4").textContent = scenario.agents[index].role;
+          worker.querySelector(".agent-task-text").textContent = scenario.agents[index].task;
+          const status = worker.querySelector(".agent-assignment");
+          status.hidden = false;
+          status.textContent = flow.dataset.pending;
+        });
+        counter.textContent = `${String(scenarioIndex + 1).padStart(2, "0")} / ${String(scenarios.length).padStart(2, "0")}`;
+        counter.setAttribute("aria-label", `${flow.dataset.scenarioLabel} ${scenarioIndex + 1} / ${scenarios.length}`);
+        elapsed = 0;
+        checkpoint = 0;
         flow.classList.remove("is-distributing");
-        label.textContent = flow.dataset.replay;
-        play.disabled = false;
-        announcement.textContent = flow.dataset.complete;
+        // Restart the route animation only when a new scenario begins.
+        void flow.offsetWidth;
+        flow.classList.add("is-distributing");
+      }
+      function clearTimer() {
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+      }
+      function scheduleNext() {
+        clearTimer();
+        if (!running) return;
+        const currentElapsed = elapsed + performance.now() - resumedAt;
+        timer = setTimeout(() => {
+          timer = null;
+          if (!running) return;
+          elapsed += performance.now() - resumedAt;
+          resumedAt = performance.now();
+          while (checkpoint < checkpoints.length && elapsed >= checkpoints[checkpoint]) {
+            if (checkpoint < workers.length) {
+              assign(workers[checkpoint]);
+              checkpoint += 1;
+            } else if (checkpoint === workers.length) {
+              flow.classList.remove("is-distributing");
+              checkpoint += 1;
+            } else {
+              scenarioIndex = (scenarioIndex + 1) % scenarios.length;
+              prepareScenario();
+              resumedAt = performance.now();
+              break;
+            }
+          }
+          scheduleNext();
+        }, Math.max(0, checkpoints[checkpoint] - currentElapsed));
+      }
+      function suspend() {
+        if (running) elapsed += performance.now() - resumedAt;
+        running = false;
+        clearTimer();
+        flow.classList.add("is-paused");
+      }
+      function reconcile() {
+        if (!started && managerReached && inViewport && !document.hidden && !reducedMotion.matches) {
+          started = true;
+          arrivalObserver?.disconnect();
+        }
+        const shouldRun = started && !userPaused && inViewport && !document.hidden &&
+          (!reducedMotion.matches || manualStart);
+        if (shouldRun && !running) {
+          running = true;
+          resumedAt = performance.now();
+          flow.classList.remove("is-paused");
+          scheduleNext();
+        } else if (!shouldRun) {
+          suspend();
+        }
+        updateControls();
       }
 
-      workers.forEach((worker) => {
-        const status = worker.querySelector(".agent-assignment");
-        status.hidden = false;
-        status.textContent = flow.dataset.pending;
-      });
+      flow.classList.add("is-paused");
+      prepareScenario();
+      updateControls();
       play.hidden = false;
       play.addEventListener("click", () => {
-        if (play.disabled) return;
-        play.disabled = true;
-        label.textContent = flow.dataset.running;
-        announcement.textContent = "";
-        workers.forEach((worker) => {
-          worker.classList.remove("is-assigned");
-          worker.querySelector(".agent-assignment").textContent = flow.dataset.pending;
-        });
-        if (reducedMotion.matches) {
-          finish();
-          return;
+        if (running) {
+          userPaused = true;
+        } else {
+          started = true;
+          userPaused = false;
+          manualStart = true;
+          inViewport = true;
+          arrivalObserver?.disconnect();
         }
-        flow.classList.add("is-distributing");
-        workers.forEach((worker, index) => {
-          timers.push(setTimeout(() => assign(worker), 1000 + index * 400));
-        });
-        timers.push(setTimeout(finish, 2200));
+        reconcile();
+        // Autoplay remains silent to screen readers; announce explicit controls only.
+        announcement.textContent = running
+          ? `${flow.dataset.running} ${scenarios[scenarioIndex].mission}`
+          : flow.dataset.paused;
       });
+      if ("IntersectionObserver" in window) {
+        arrivalObserver = new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5)) {
+            managerReached = true;
+            inViewport = true;
+            reconcile();
+          }
+        }, { threshold: 0.5, rootMargin: "0px 0px -48px 0px" });
+        arrivalObserver.observe(flow.querySelector(".agent-manager"));
+        const visibilityObserver = new IntersectionObserver((entries) => {
+          inViewport = entries.some((entry) => entry.isIntersecting);
+          reconcile();
+        }, { threshold: 0 });
+        // The manager can scroll away while the employees remain visible on mobile.
+        visibilityObserver.observe(flow);
+      }
+      document.addEventListener("visibilitychange", reconcile);
       reducedMotion.addEventListener("change", () => {
-        if (reducedMotion.matches && play.disabled) finish();
+        if (reducedMotion.matches) flow.classList.remove("is-distributing");
+        reconcile();
       });
     }
   });

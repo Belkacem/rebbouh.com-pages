@@ -23,6 +23,9 @@
   --paper-ink: #292c25;
   --paper-accent: #a63c29;
   --shadow: #11120f;
+  --agent-surface: #22241f;
+  --agent-shadow: 0 12px 28px #00000024;
+  --agent-wash: #ff806712;
   --display: "Bricolage", "Arial", sans-serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -36,6 +39,9 @@
   --accent: #a63c29;
   --paper: #fffaf0;
   --shadow: #ddd5c5;
+  --agent-surface: #faf7ef;
+  --agent-shadow: 0 12px 28px #6c513614;
+  --agent-wash: #a63c2910;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
@@ -47,6 +53,9 @@
     --accent: #a63c29;
     --paper: #fffaf0;
     --shadow: #ddd5c5;
+    --agent-surface: #faf7ef;
+    --agent-shadow: 0 12px 28px #6c513614;
+    --agent-wash: #a63c2910;
   }
 }
 * { box-sizing: border-box; }
@@ -128,37 +137,43 @@ details[open] > summary .expand-mark::after { transform: rotate(0deg); }
 .notebook-footer { border-top: 1px solid #bcb9aa; padding-top: 16px; font: 10px/1.7 var(--mono); color: #626455; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .agent-flow { grid-column: 1 / -1; min-width: 0; padding-top: 45px; border-top: 1px solid var(--line); }
-.agent-flow-caption { display: flex; align-items: end; justify-content: space-between; gap: 25px; margin-bottom: 42px; }
+.agent-flow-caption { display: flex; align-items: center; justify-content: space-between; gap: 25px; margin-bottom: 55px; }
 .agent-flow-caption .section-label { margin-bottom: 13px; }
 .agent-flow-caption h3 { font: 500 32px/1.15 var(--display); letter-spacing: -.025em; }
-.flow-play { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: transparent; font: 12px/1.5 var(--sans); cursor: pointer; white-space: nowrap; }
+.flow-controls { display: grid; grid-template-columns: auto auto; gap: 5px 14px; align-items: center; flex-shrink: 0; }
+.flow-scenario-count { font: 11px/1.5 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.flow-state { grid-column: 1 / -1; min-height: 16px; text-align: right; color: var(--muted); font: 10px/1.6 var(--mono); }
+.flow-play { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 118px; min-height: 44px; padding: 10px 17px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--agent-surface); font: 12px/1.5 var(--sans); cursor: pointer; white-space: nowrap; }
 .flow-play[hidden] { display: none; }
-.flow-play > span:first-child { color: var(--accent); font-size: 20px; line-height: 1; }
+.flow-play > span:first-child { color: var(--accent); font-size: 14px; line-height: 1; }
 .flow-play:hover, .flow-play:disabled { border-color: var(--accent); }
 .flow-play:disabled { cursor: progress; }
 .agent-tree { max-width: 1000px; margin-inline: auto; }
-.agent-manager { width: min(100%, 360px); margin-inline: auto; padding: 22px 25px; border: 1px solid var(--accent); border-top-width: 3px; text-align: center; }
-.agent-mission { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.agent-manager { width: min(100%, 370px); margin-inline: auto; padding: 30px 27px 24px; border: 1px solid var(--accent); border-radius: 24px; background: var(--agent-surface); box-shadow: var(--agent-shadow); text-align: center; position: relative; }
+.agent-manager-mark { display: grid; place-items: center; width: 46px; height: 46px; margin: -54px auto 17px; border: 1px solid var(--accent); border-radius: 50%; background: var(--agent-surface); color: var(--accent); }
+.agent-mission { color: var(--muted); font-size: 13px; margin-bottom: 12px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .agent-manager h4 { font: 500 25px/1.3 var(--display); }
 .agent-manager-description { font-size: 12px; color: var(--muted); margin-top: 8px; }
 .agent-routes { display: block; width: 100%; height: 88px; overflow: visible; color: var(--accent); }
-.agent-route, .task-route { fill: none; vector-effect: non-scaling-stroke; }
+.agent-route, .task-route { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .agent-route { stroke: var(--muted); stroke-width: 1.5; }
 .task-route { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 8 100; stroke-dashoffset: 8; opacity: 0; }
 .is-distributing .task-route { animation: delegate-task 1s linear both; animation-delay: calc(var(--agent-step) * .4s); }
+.is-distributing.is-paused .task-route { animation-play-state: paused; }
 @keyframes delegate-task { 0% { opacity: 0; stroke-dashoffset: 8; } 5%, 90% { opacity: 1; } 100% { opacity: 0; stroke-dashoffset: -100; } }
 .agent-workers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; list-style: none; padding: 0; margin: 0; }
-.agent-worker { min-width: 0; padding: 21px 19px 16px; border: 1px solid var(--line); position: relative; transition: border-color .2s; }
+.agent-worker { min-width: 0; padding: 22px 19px 17px; border: 1px solid var(--line); border-radius: 20px; background: var(--agent-surface); box-shadow: var(--agent-shadow); position: relative; transition: border-color .2s; }
 .agent-worker-heading { display: flex; align-items: center; gap: 13px; }
-.agent-number { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border: 1px solid var(--line); border-radius: 50%; font: 11px/1 var(--mono); color: var(--accent); }
+.agent-number { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; background: var(--agent-wash); font: 11px/1 var(--mono); color: var(--accent); }
 .agent-kind { color: var(--muted); font: 9px/1.5 var(--mono); margin-bottom: 4px; }
 .agent-worker h4 { font: 500 21px/1.2 var(--display); letter-spacing: -.3px; }
-.agent-task { margin-top: 20px; padding: 14px 13px; border-left: 2px solid var(--paper-accent); color: var(--paper-ink); background: var(--paper); font-size: 13px; line-height: 1.6; min-height: 115px; }
+.agent-task { margin-top: 20px; padding: 16px 14px; border-radius: 12px; color: var(--paper-ink); background: var(--paper); font-size: 13px; line-height: 1.6; min-height: 150px; }
 .agent-task .agent-task-label { color: var(--paper-accent); font: 9px/1.5 var(--mono); margin-bottom: 8px; }
-.agent-assignment { margin-top: 14px; color: var(--muted); font: 10px/1.5 var(--mono); }
+.agent-assignment { display: inline-flex; align-items: center; margin-top: 14px; padding: 4px 9px; border-radius: 999px; color: var(--muted); font: 10px/1.5 var(--mono); }
+.agent-assignment[hidden] { display: none; }
 .agent-assignment::before { content: "○"; margin-right: 7px; }
 .agent-worker.is-assigned { border-color: var(--accent); }
-.is-assigned .agent-assignment { color: var(--accent); }
+.is-assigned .agent-assignment { color: var(--accent); background: var(--agent-wash); }
 .is-assigned .agent-assignment::before { content: "✓"; }
 .career-section { border-top: 1px solid var(--line); padding-block: 90px 95px; }
 .career-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 90px; }
@@ -270,17 +285,18 @@ details[open] > summary .expand-mark::after { transform: rotate(0deg); }
   .mechanism summary { font-size: 16px; grid-template-columns: 18px minmax(0, 1fr) 13px; gap: 10px; padding-block: 17px; }
   .mechanism p { padding-left: 28px; font-size: 13px; }
   .agent-flow { padding-top: 30px; }
-  .agent-flow-caption { align-items: start; flex-direction: column; gap: 19px; margin-bottom: 30px; }
+  .agent-flow-caption { align-items: start; flex-direction: column; gap: 19px; margin-bottom: 50px; }
   .agent-flow-caption h3 { font-size: 29px; }
-  .agent-manager { padding: 20px; }
+  .agent-manager { padding: 26px 20px 22px; }
+  .agent-manager-mark { margin-top: -50px; }
   .agent-routes { display: none; }
   .agent-workers { display: flex; flex-direction: column; gap: 20px; margin-left: 18px; padding: 28px 0 0 24px; border-left: 1px solid var(--muted); }
   .is-distributing .agent-workers { border-left-color: var(--accent); }
   .agent-worker { padding: 17px 15px 14px; }
-  .agent-worker::before { content: ""; position: absolute; top: 27px; left: -25px; width: 24px; height: 1px; background: var(--muted); }
+  .agent-worker::before { content: ""; position: absolute; top: 12px; left: -25px; width: 24px; height: 16px; border-left: 1px solid var(--muted); border-bottom: 1px solid var(--muted); border-bottom-left-radius: 14px; }
   .agent-worker::after { content: ""; position: absolute; top: 24px; left: -6px; width: 6px; height: 6px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); transform: rotate(45deg); }
   .agent-worker h4 { font-size: 20px; }
-  .agent-task { min-height: 0; margin-top: 16px; }
+  .agent-task { min-height: 130px; margin-top: 16px; }
   .career-section { padding-block: 51px 55px; }
   .career-intro { grid-template-columns: 1fr; gap: 22px; }
   .career-intro h2 { max-width: 270px; }
@@ -315,10 +331,10 @@ details[open] > summary .expand-mark::after { transform: rotate(0deg); }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 @media print {
-  :root, :root[data-theme], :root:not([data-theme]) { color-scheme: light; --ground: white; --ink: #20221e; --muted: #51534b; --line: #c6c7bf; --accent: #9c3827; --paper: white; }
+  :root, :root[data-theme], :root:not([data-theme]) { color-scheme: light; --ground: white; --ink: #20221e; --muted: #51534b; --line: #c6c7bf; --accent: #9c3827; --paper: white; --agent-surface: white; --agent-shadow: none; }
   body { font-size: 11px; }
   .wrap { width: 100%; }
-  .header, .footer, .work-link, .hero-footer, .flow-play, .agent-assignment { display: none; }
+  .header, .footer, .work-link, .hero-footer, .flow-controls, .agent-assignment { display: none; }
   .hero { padding-top: 0; grid-template-columns: 1fr 160px; column-gap: 30px; }
   .hero h1 { font-size: 57px; }
   .hero .surname { margin-left: 20px; }
