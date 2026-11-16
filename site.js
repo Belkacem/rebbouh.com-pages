@@ -68,9 +68,13 @@
       const label = play.querySelector(".flow-play-label");
       const icon = play.querySelector(".flow-control-icon");
       const workers = [...flow.querySelectorAll(".agent-worker")];
+      const manager = flow.querySelector(".agent-manager");
       const mission = flow.querySelector(".agent-mission");
+      const managerResultLabel = flow.querySelector(".manager-result-label");
+      const managerResultText = flow.querySelector(".manager-result-text");
       const counter = flow.querySelector(".flow-scenario-count");
       const state = flow.querySelector(".flow-state");
+      const phase = flow.querySelector(".flow-phase");
       const announcement = flow.querySelector(".flow-announcement");
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
       let scenarios;
@@ -80,11 +84,18 @@
         return; // Keep the static diagram if its optional scenario data is unavailable.
       }
       if (!Array.isArray(scenarios) || !scenarios.length || !scenarios.every((scenario) =>
-        typeof scenario.mission === "string" && Array.isArray(scenario.agents) &&
+        typeof scenario.mission === "string" && typeof scenario.synthesis === "string" && Array.isArray(scenario.agents) &&
         scenario.agents.length === workers.length && scenario.agents.every((agent) =>
-          typeof agent.role === "string" && typeof agent.task === "string"))) return;
+          typeof agent.role === "string" && typeof agent.task === "string" && typeof agent.result === "string"))) return;
 
-      const checkpoints = [...workers.map((_, index) => 1000 + index * 400), 2200, 7000];
+      const checkpoints = [
+        ...workers.map((_, index) => ({ at: 1000 + index * 400, action: "assign", index })),
+        { at: 2200, action: "working" },
+        { at: 4300, action: "returning" },
+        ...workers.map((_, index) => ({ at: 5300 + index * 400, action: "receive", index })),
+        { at: 6500, action: "synthesise" },
+        { at: 11500, action: "next" },
+      ];
       let scenarioIndex = 0;
       let checkpoint = 0;
       let elapsed = 0;
@@ -110,12 +121,53 @@
         worker.classList.add("is-assigned");
         worker.querySelector(".agent-assignment").textContent = flow.dataset.assigned;
       }
+      function setPhase(name) {
+        flow.dataset.phase = name;
+        phase.textContent = flow.dataset[`phase${name[0].toUpperCase()}${name.slice(1)}`];
+      }
+      function runCheckpoint(event) {
+        const scenario = scenarios[scenarioIndex];
+        if (event.action === "assign") {
+          assign(workers[event.index]);
+        } else if (event.action === "working") {
+          flow.classList.remove("is-distributing");
+          setPhase("working");
+          workers.forEach((worker) => {
+            worker.querySelector(".agent-assignment").textContent = flow.dataset.working;
+          });
+        } else if (event.action === "returning") {
+          setPhase("returning");
+          workers.forEach((worker, index) => {
+            worker.classList.add("has-result");
+            worker.querySelector(".agent-task-label").textContent = flow.dataset.resultLabel;
+            worker.querySelector(".agent-task-text").textContent = scenario.agents[index].result;
+            worker.querySelector(".agent-assignment").textContent = flow.dataset.resultReady;
+          });
+          managerResultLabel.textContent = flow.dataset.collecting;
+          managerResultText.textContent = `0 / ${workers.length}`;
+          flow.classList.add("is-returning");
+        } else if (event.action === "receive") {
+          workers[event.index].classList.add("is-returned");
+          workers[event.index].querySelector(".agent-assignment").textContent = flow.dataset.returned;
+          managerResultText.textContent = `${event.index + 1} / ${workers.length}`;
+        } else if (event.action === "synthesise") {
+          flow.classList.remove("is-returning");
+          setPhase("synthesising");
+          manager.classList.add("has-synthesis");
+          managerResultLabel.textContent = flow.dataset.synthesised;
+          managerResultText.textContent = scenario.synthesis;
+        }
+      }
       function prepareScenario() {
         const scenario = scenarios[scenarioIndex];
         mission.textContent = scenario.mission;
+        manager.classList.remove("has-synthesis");
+        managerResultLabel.textContent = flow.dataset.collecting;
+        managerResultText.textContent = flow.dataset.waitingResults;
         workers.forEach((worker, index) => {
-          worker.classList.remove("is-assigned");
+          worker.classList.remove("is-assigned", "has-result", "is-returned");
           worker.querySelector("h4").textContent = scenario.agents[index].role;
+          worker.querySelector(".agent-task-label").textContent = flow.dataset.taskLabel;
           worker.querySelector(".agent-task-text").textContent = scenario.agents[index].task;
           const status = worker.querySelector(".agent-assignment");
           status.hidden = false;
@@ -125,7 +177,8 @@
         counter.setAttribute("aria-label", `${flow.dataset.scenarioLabel} ${scenarioIndex + 1} / ${scenarios.length}`);
         elapsed = 0;
         checkpoint = 0;
-        flow.classList.remove("is-distributing");
+        setPhase("delegating");
+        flow.classList.remove("is-distributing", "is-returning");
         // Restart the route animation only when a new scenario begins.
         void flow.offsetWidth;
         flow.classList.add("is-distributing");
@@ -143,22 +196,19 @@
           if (!running) return;
           elapsed += performance.now() - resumedAt;
           resumedAt = performance.now();
-          while (checkpoint < checkpoints.length && elapsed >= checkpoints[checkpoint]) {
-            if (checkpoint < workers.length) {
-              assign(workers[checkpoint]);
-              checkpoint += 1;
-            } else if (checkpoint === workers.length) {
-              flow.classList.remove("is-distributing");
-              checkpoint += 1;
-            } else {
+          while (checkpoint < checkpoints.length && elapsed >= checkpoints[checkpoint].at) {
+            const event = checkpoints[checkpoint];
+            if (event.action === "next") {
               scenarioIndex = (scenarioIndex + 1) % scenarios.length;
               prepareScenario();
               resumedAt = performance.now();
               break;
             }
+            runCheckpoint(event);
+            checkpoint += 1;
           }
           scheduleNext();
-        }, Math.max(0, checkpoints[checkpoint] - currentElapsed));
+        }, Math.max(0, checkpoints[checkpoint].at - currentElapsed));
       }
       function suspend() {
         if (running) elapsed += performance.now() - resumedAt;
@@ -212,7 +262,7 @@
             reconcile();
           }
         }, { threshold: 0.5, rootMargin: "0px 0px -48px 0px" });
-        arrivalObserver.observe(flow.querySelector(".agent-manager"));
+        arrivalObserver.observe(manager);
         const visibilityObserver = new IntersectionObserver((entries) => {
           inViewport = entries.some((entry) => entry.isIntersecting);
           reconcile();
@@ -222,7 +272,7 @@
       }
       document.addEventListener("visibilitychange", reconcile);
       reducedMotion.addEventListener("change", () => {
-        if (reducedMotion.matches) flow.classList.remove("is-distributing");
+        if (reducedMotion.matches) flow.classList.remove("is-distributing", "is-returning");
         reconcile();
       });
     }
