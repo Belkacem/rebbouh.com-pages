@@ -44,6 +44,7 @@ p,
 h1,
 h2,
 h3,
+h4,
 dl,
 dd {
   margin: 0;
@@ -254,6 +255,44 @@ h2 {
   font-size: 14px;
   margin-top: 23px;
 }
+.career-group {
+  margin-top: 34px;
+}
+.career-group > h3 {
+  margin-bottom: 15px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.experience {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 24px;
+  padding-block: 22px;
+  border-top: 1px solid var(--line);
+}
+.experience-meta {
+  font: 11px/1.8 var(--mono);
+  color: var(--muted);
+}
+.experience-meta span {
+  display: block;
+}
+.experience h4 {
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.experience-role {
+  color: var(--accent);
+  font-size: 13px;
+  margin-top: 2px;
+}
+.experience-description {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--secondary);
+}
 .paragraph-link a,
 .contact-links a {
   color: var(--accent);
@@ -405,6 +444,16 @@ h2 {
   .mechanism dd {
     font-size: 14px;
   }
+  .experience {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding-block: 20px;
+  }
+  .experience-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+  }
   .archive-item {
     grid-template-columns: 42px minmax(0, 1fr);
     gap: 10px;
@@ -462,6 +511,7 @@ h2 {
     gap: 20px;
   }
   .mechanism,
+  .experience,
   .archive-item {
     break-inside: avoid;
   }
